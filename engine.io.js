@@ -78,6 +78,7 @@ function Socket(uri, opts){
     if (pieces.length) opts.port = pieces.pop();
   }
 
+  this.cookie = opts.cookie;
   this.agent = opts.agent || false;
   this.hostname = opts.hostname ||
     (global.location ? location.hostname : 'localhost');
@@ -149,7 +150,7 @@ Socket.parser = _dereq_('engine.io-parser');
  * @api private
  */
 
-Socket.prototype.createTransport = function (name) {
+Socket.prototype.createTransport = function (name, cookie) {
   debug('creating transport "%s"', name);
   var query = clone(this.query);
 
@@ -183,7 +184,8 @@ Socket.prototype.createTransport = function (name) {
     cert: this.cert,
     ca: this.ca,
     ciphers: this.ciphers,
-    rejectUnauthorized: this.rejectUnauthorized
+    rejectUnauthorized: this.rejectUnauthorized,
+    cookie: cookie
   });
 
   return transport;
@@ -223,7 +225,7 @@ Socket.prototype.open = function () {
   // Retry with the next transport if the transport is disabled (jsonp: false)
   var transport;
   try {
-    transport = this.createTransport(transport);
+    transport = this.createTransport(transport, this.cookie);
   } catch (e) {
     this.transports.shift();
     this.open();
@@ -1212,6 +1214,7 @@ function empty(){}
 
 function XHR(opts){
   Polling.call(this, opts);
+  this.cookie = opts.cookie;
 
   if (global.location) {
     var isSSL = 'https:' == location.protocol;
@@ -1264,6 +1267,8 @@ XHR.prototype.request = function(opts){
   opts.ca = this.ca;
   opts.ciphers = this.ciphers;
   opts.rejectUnauthorized = this.rejectUnauthorized;
+
+  opts.cookie = this.cookie;
 
   return new Request(opts);
 };
@@ -1334,6 +1339,8 @@ function Request(opts){
   this.ciphers = opts.ciphers;
   this.rejectUnauthorized = opts.rejectUnauthorized;
 
+  this.cookie = opts.cookie;
+
   this.create();
 }
 
@@ -1367,6 +1374,13 @@ Request.prototype.create = function(){
   try {
     debug('xhr open %s: %s', this.method, this.uri);
     xhr.open(this.method, this.uri, this.async);
+    
+    if(this.cookie) {
+      xhr.setDisableHeaderCheck(true);
+      xhr.setRequestHeader('cookie', this.cookie);
+      xhr.setDisableHeaderCheck(false);
+    }
+
     if (this.supportsBinary) {
       // This has to be done after open because Firefox is stupid
       // http://stackoverflow.com/questions/13216903/get-binary-data-with-xmlhttprequest-in-a-firefox-extension
