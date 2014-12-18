@@ -79,6 +79,8 @@ function Socket(uri, opts){
   }
 
   this.cookie = opts.cookie;
+  this.referer = opts.referer;
+
   this.agent = opts.agent || false;
   this.hostname = opts.hostname ||
     (global.location ? location.hostname : 'localhost');
@@ -150,7 +152,7 @@ Socket.parser = _dereq_('engine.io-parser');
  * @api private
  */
 
-Socket.prototype.createTransport = function (name, cookie) {
+Socket.prototype.createTransport = function (name, cookie, referer) {
   debug('creating transport "%s"', name);
   var query = clone(this.query);
 
@@ -185,7 +187,8 @@ Socket.prototype.createTransport = function (name, cookie) {
     ca: this.ca,
     ciphers: this.ciphers,
     rejectUnauthorized: this.rejectUnauthorized,
-    cookie: cookie
+    cookie: cookie,
+    referer: referer,
   });
 
   return transport;
@@ -225,7 +228,7 @@ Socket.prototype.open = function () {
   // Retry with the next transport if the transport is disabled (jsonp: false)
   var transport;
   try {
-    transport = this.createTransport(transport, this.cookie);
+    transport = this.createTransport(transport, this.cookie, this.referer);
   } catch (e) {
     this.transports.shift();
     this.open();
@@ -1215,6 +1218,7 @@ function empty(){}
 function XHR(opts){
   Polling.call(this, opts);
   this.cookie = opts.cookie;
+  this.referer = opts.referer;
 
   if (global.location) {
     var isSSL = 'https:' == location.protocol;
@@ -1269,6 +1273,7 @@ XHR.prototype.request = function(opts){
   opts.rejectUnauthorized = this.rejectUnauthorized;
 
   opts.cookie = this.cookie;
+  opts.referer = this.referer;
 
   return new Request(opts);
 };
@@ -1340,6 +1345,7 @@ function Request(opts){
   this.rejectUnauthorized = opts.rejectUnauthorized;
 
   this.cookie = opts.cookie;
+  this.referer = opts.referer;
 
   this.create();
 }
@@ -1375,9 +1381,10 @@ Request.prototype.create = function(){
     debug('xhr open %s: %s', this.method, this.uri);
     xhr.open(this.method, this.uri, this.async);
     
-    if(this.cookie) {
+    if(this.cookie || this.referer) {
       xhr.setDisableHeaderCheck(true);
-      xhr.setRequestHeader('cookie', this.cookie);
+      this.cookie && xhr.setRequestHeader('cookie', this.cookie);
+      this.referer && xhr.setRequestHeader('referer', this.referer);
       xhr.setDisableHeaderCheck(false);
     }
 
